@@ -1,0 +1,9 @@
+[submodule "behavior-analytics-services"]
+	path = behavior-analytics-services
+	url = https://github.com/rhm-samples/behavior-analytics-services
+[submodule "iot-docs"]
+	path = iot-docs
+	url = https://github.com/ibm-watson-iot/iot-docs
+[submodule "mongodb-kubernetes-operator"]
+	path = mongodb-kubernetes-operator
+	url = https://github.com/mongodb/mongodb-kubernetes-operator
