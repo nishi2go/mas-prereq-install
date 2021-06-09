@@ -20,6 +20,7 @@ fi
 WORK_DIR="${SCRIPT_DIR}/work"
 DATETIME=`date +%Y%m%d_%H%M%S`
 
+mkdir logs
 logFile="${SCRIPT_DIR}/logs/mongo-installation-${DATETIME}.log"
 touch "${logFile}"
 
