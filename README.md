@@ -1,7 +1,8 @@
 # mas-prereq-install
 Prereq software installation script for Maximo Application Suite 8.4
 
-"""
+Example:
+```bash
 $ yum install jq gettext git wget
 $ git clone --recursive https://github.com/nishi2go/mas-prereq-install
 $ cd mas-prereq-install
@@ -14,4 +15,4 @@ $ export STORAGECLASS_RWM=ibmc-file-bronze-gid
 $ export DOMAIN_NAME=apps-crc.testing
 $ oc login -u kubeadmin -p ************ https://api.crc.testing:6443
 $ bash setup.sh
-"""
+```
