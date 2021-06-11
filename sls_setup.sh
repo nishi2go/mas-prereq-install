@@ -15,7 +15,7 @@ function stepLog() {
 
 DATETIME=$(date +%Y%m%d_%H%M%S)
 
-mkdir logs
+mkdir -p logs
 logFile="${SCRIPT_DIR}/logs/sls-installation-${DATETIME}.log"
 touch "${logFile}"
 projectName="ibm-sls"
@@ -35,6 +35,11 @@ if [ -z "${STORAGECLASS_RWM}" ]; then
   exit 1
 fi
 
+if [ -z "${DOMAIN_NAME}" ]; then
+  echoRed "Missing domain name in environemnt variable DOMAIN_NAME."
+  exit 1
+fi
+
 if [ -z "${MONGO_REPLICAS}" ]; then
   MONGO_REPLICAS="3"
 fi
@@ -42,11 +47,6 @@ fi
 status=$(oc whoami 2>&1)
 if [[ $? -gt 0 ]]; then
   echoRed "Login to OpenShift to continue SLS Operator installation."
-  exit 1
-fi
-
-if [ -z "${DOMAIN_NAME}" ]; then
-  echoRed "Missing domain name in environemnt variable DOMAIN_NAME."
   exit 1
 fi
 
@@ -97,7 +97,7 @@ EOF
 displayStepHeader 7 "Create License Service instance."
 MONGO_CERT=$(oc get configmap mas-mongo-ce-cert-map -n mongo -o jsonpath='{.data.ca\.crt}' | sed -E  ':a;N;$!ba;s/\r{0,1}\n/\\n/g')
 MONGO_NODES=""
-for i in `seq 0 ${MONGO_REPLICAS}`; do
+for i in `seq 0 $((${MONGO_REPLICAS}-1))`; do
     MONGO_NODES="${MONGO_NODES}\n      - host: mas-mongo-ce-${i}.mas-mongo-ce-svc.mongo.svc.cluster.local\n        port: 27017\n"
 done
 MONGO_NODES=$(echo -ne "${MONGO_NODES}")
