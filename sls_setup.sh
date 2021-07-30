@@ -148,4 +148,4 @@ ${MONGO_NODES}
 EOF
 
 displayStepHeader 8 "Wait License Service instance ready."
-while [[ $(oc get -n ibm-sls licenseservice | grep sls | tr -s " " | cut -d' ' -f 3) != "True" ]]; do sleep 5s; done
+while [[ $(oc get -n ${projectName} licenseservice | grep sls | tr -s " " | cut -d' ' -f 3) != "True" ]]; do sleep 5s; done
