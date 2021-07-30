@@ -14,13 +14,13 @@ if [ -z "${MONGO_NAMESPACE}" ]; then
 fi
 
 if [ -z "${MONGO_REPLICAS}" ]; then
-  MONGO_REPLICAS="1"
+  MONGO_REPLICAS="3"
 fi
 
 WORK_DIR="${SCRIPT_DIR}/work"
 DATETIME=`date +%Y%m%d_%H%M%S`
 
-mkdir logs
+mkdir -p logs
 logFile="${SCRIPT_DIR}/logs/mongo-installation-${DATETIME}.log"
 touch "${logFile}"
 
@@ -52,8 +52,10 @@ cp "${SCRIPT_DIR}/mongodb-kubernetes-operator/config/crd/bases/mongodbcommunity.
 
 displayStepHeader 3 "Generate self-signed certificates."
 
-cd "${WORK_DIR}/mongodb/certs"
-bash "${WORK_DIR}/mongodb/certs/generateSelfSignedCert.sh" | tee -a tee "${logFile}"
+if [[ ! -f "${WORK_DIR}/mongodb/certs/client.pem" ]]; then
+  cd "${WORK_DIR}/mongodb/certs"
+  "${WORK_DIR}/mongodb/certs/generateSelfSignedCert.sh" | tee -a "${logFile}"
+fi
 
 displayStepHeader 4 "Update MongoDB password."
 
@@ -61,7 +63,7 @@ if [ -z "${MONGO_PASSWORD}" ]; then
   MONGO_PASSWORD=`openssl rand -hex 10`
 fi
 
-cat <<EOF | oc apply -f - | tee -a tee "${logFile}"
+cat <<EOF | oc apply -f - | tee -a "${logFile}"
 apiVersion: v1
 kind: Secret
 metadata:
@@ -73,42 +75,44 @@ stringData:
 EOF
 
 displayStepHeader 5 "Install MongoDB Operator."
-envsubst < "${SCRIPT_DIR}/mongodb/msi-mas_v1_mongodbcommunity_openshift_cr.yaml" > "${WORK_DIR}/mongodb/config/mas-mongo-ce/mas_v1_mongodbcommunity_openshift_cr.yaml"
+cat "${SCRIPT_DIR}/mongodb/msi-mas_v1_mongodbcommunity_openshift_cr.yaml" | envsubst > "${WORK_DIR}/mongodb/config/mas-mongo-ce/mas_v1_mongodbcommunity_openshift_cr.yaml"
 
 cd "${WORK_DIR}/mongodb/"
 
-oc new-project ${MONGO_NAMESPACE}
+#oc new-project "${MONGO_NAMESPACE}" | tee -a tee "${logFile}"
 
-oc apply -f config/crd/mongodbcommunity.mongodb.com_mongodbcommunity.yaml -n ${MONGO_NAMESPACE}
+oc apply -f config/crd/mongodbcommunity.mongodb.com_mongodbcommunity.yaml -n "${MONGO_NAMESPACE}" | tee -a "${logFile}"
 
-oc apply -k config/rbac/.  -n ${MONGO_NAMESPACE}
+oc apply -k config/rbac/. -n "${MONGO_NAMESPACE}" | tee -a "${logFile}"
 
-oc adm policy add-scc-to-user anyuid system:serviceaccount:${MONGO_NAMESPACE}:default
-oc adm policy add-scc-to-user anyuid system:serviceaccount:${MONGO_NAMESPACE}:mongodb-kubernetes-operator
+oc adm policy add-scc-to-user anyuid "system:serviceaccount:${MONGO_NAMESPACE}:default" | tee -a "${logFile}"
+oc adm policy add-scc-to-user anyuid "system:serviceaccount:${MONGO_NAMESPACE}:mongodb-kubernetes-operator" | tee -a "${logFile}"
 
-oc create -f config/manager/manager.yaml -n ${MONGO_NAMESPACE}
+oc create -f config/manager/manager.yaml -n "${MONGO_NAMESPACE}" | tee -a "${logFile}"
 echo -n " - Waiting for MongoDB CE Operator  "
-while [[ $(oc get deployment mongodb-kubernetes-operator -n ${MONGO_NAMESPACE} -o 'jsonpath={..status.conditions[?(@.type=="Available")].status}') != "True" ]];do sleep 5s; done
+sleep 5s
+while [[ $(oc get deployment mongodb-kubernetes-operator -n "${MONGO_NAMESPACE}" -o 'jsonpath={..status.conditions[?(@.type=="Available")].status}') != *"True"* ]];do sleep 5s; done
 
-if [ ! -f certs/client.pem  ]; then
+if [[ -f certs/client.pem ]]; then
   cd certs
-  oc create configmap mas-mongo-ce-cert-map --from-file=ca.crt=ca.pem -n ${MONGO_NAMESPACE}
-  oc create secret tls mas-mongo-ce-cert-secret --cert=server.crt --key=server.key -n ${MONGO_NAMESPACE}
+  oc create configmap mas-mongo-ce-cert-map --from-file=ca.crt=ca.pem -n "${MONGO_NAMESPACE}" | tee -a "${logFile}"
+  oc create secret tls mas-mongo-ce-cert-secret --cert=server.crt --key=server.key -n "${MONGO_NAMESPACE}" | tee -a "${logFile}"
   cd ..
 fi
 
-oc apply -f config/mas-mongo-ce/mas_v1_mongodbcommunity_openshift_cr.yaml -n ${MONGO_NAMESPACE}
+oc apply -f config/mas-mongo-ce/mas_v1_mongodbcommunity_openshift_cr.yaml -n "${MONGO_NAMESPACE}" | tee -a "${logFile}"
 
 sleep 5s
-while [[ $(oc get statefulset mas-mongo-ce -n ${MONGO_NAMESPACE} --ignore-not-found -o 'jsonpath={..status.readyReplicas}') != "1" ]];do sleep 5s; done
 
-oc rollout restart statefulset mas-mongo-ce -n ${MONGO_NAMESPACE}
+while [[ $(oc get statefulset mas-mongo-ce -n "${MONGO_NAMESPACE}" --ignore-not-found -o 'jsonpath={..status.readyReplicas}') != *"${MONGO_REPLICAS}"* ]];do sleep 5s; done
+
+oc rollout restart statefulset mas-mongo-ce -n "${MONGO_NAMESPACE}" | tee -a "${logFile}"
 sleep 5s
 
 displayStepHeader 6 "Enable SCRAM-SHA-1 Auth."
-JSON=$(oc get secret mas-mongo-ce-config -n ${MONGO_NAMESPACE} -o 'jsonpath={..data.cluster-config\.json}' | base64 -d  | jq -c '.auth.autoAuthMechanisms|=["SCRAM-SHA-256", "SCRAM-SHA-1"]' | jq -c '.auth.deploymentAuthMechanisms|=["SCRAM-SHA-256", "SCRAM-SHA-1"]' | base64 -w 0)
+JSON=$(oc get secret mas-mongo-ce-config -n "${MONGO_NAMESPACE}" -o 'jsonpath={..data.cluster-config\.json}' | base64 -d  | jq -c '.auth.autoAuthMechanisms|=["SCRAM-SHA-256", "SCRAM-SHA-1"]' | jq -c '.auth.deploymentAuthMechanisms|=["SCRAM-SHA-256", "SCRAM-SHA-1"]' | base64 -w 0)
 
-oc patch secret mas-mongo-ce-config -n "${MONGO_NAMESPACE}" -p="{\"data\":{\"cluster-config.json\": \"${JSON}\"}}" -v=1
-oc rollout restart statefulset mas-mongo-ce -n "${MONGO_NAMESPACE}"
+oc patch secret mas-mongo-ce-config -n "${MONGO_NAMESPACE}" -p="{\"data\":{\"cluster-config.json\": \"${JSON}\"}}"  | tee -a "${logFile}"
+oc rollout restart statefulset mas-mongo-ce -n "${MONGO_NAMESPACE}" | tee -a "${logFile}"
 sleep 10s
-while [[ $(oc get statefulset mas-mongo-ce -n ${MONGO_NAMESPACE} --ignore-not-found -o 'jsonpath={..status.readyReplicas}') != "1" ]];do sleep 5s; done
+while [[ $(oc get statefulset mas-mongo-ce -n "${MONGO_NAMESPACE}" --ignore-not-found -o 'jsonpath={..status.readyReplicas}') != *"${MONGO_REPLICAS}"* ]];do sleep 5s; done

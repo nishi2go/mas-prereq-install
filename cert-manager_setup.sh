@@ -11,7 +11,7 @@ function stepLog() {
 
 DATETIME=`date +%Y%m%d_%H%M%S`
 
-mkdir logs
+mkdir -p logs
 logFile="${SCRIPT_DIR}/logs/cert-manager-installation-${DATETIME}.log"
 touch "${logFile}"
 

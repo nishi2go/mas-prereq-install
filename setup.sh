@@ -22,10 +22,13 @@ if [ -z "${DOMAIN_NAME}" ]; then
   exit 1
 fi
 
+if [ ! -z "${OC_USERNAME}" ] && [ ! -z "${OC_PASSWORD}" ] && [ ! -z "${OC_URL}" ]; then
+   oc login -u "${OC_USERNAME}" -p "${OC_PASSWORD}" "${OC_URL}"
+fi
+
 mkdir -p logs
 rm -rf work/*
 
-./sb_setup.sh
 ./mongo_setup.sh
 ./sb_setup.sh
 ./cert-manager_setup.sh
