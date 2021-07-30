@@ -118,6 +118,7 @@ spec:
   domain: ${DOMAIN_NAME}
   mongo:
     authMechanism: DEFAULT
+    retryWrites: true
     configDb: admin
     nodes:
 ${MONGO_NODES}
