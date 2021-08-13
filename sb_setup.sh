@@ -32,19 +32,21 @@ metadata:
   name: rh-service-binding-operator
   namespace: openshift-operators
 spec:
-  channel: beta
+  channel: preview
   name: rh-service-binding-operator
   source: redhat-operators
   sourceNamespace: openshift-marketplace
+  installPlanApproval: Manual
+  startingCSV: service-binding-operator.v0.8.0
 EOF
 
 displayStepHeader 2 "Verify Service Binding Operator installation"
 operatorName="service-binding-operator"
-check_for_csv_success=$(checkOperatorInstallationSucceeded)
+check_for_csv_success=$(checkOperatorInstallationSucceeded 2>&1)
 
 if [[ "${check_for_csv_success}" == "Succeeded" ]]; then
 	echoGreen "Service Binding Operators Operator installed"
 else
-  echoRed "Service Binding Operators Operator installation failed."
+    echoRed "Service Binding Operators Operator installation failed."
 	exit 1;
 fi
