@@ -95,10 +95,10 @@ stringData:
 EOF
 
 displayStepHeader 7 "Create License Service instance."
-MONGO_CERT=$(oc get configmap mas-mongo-ce-cert-map -n mongo -o jsonpath='{.data.ca\.crt}' | sed -E  ':a;N;$!ba;s/\r{0,1}\n/\\n/g')
+MONGO_CERT=$(oc get configmap mas-mongo-ce-cert-map -n mongo -o jsonpath='{.data.ca\.crt}' | sed -E ':a;N;$!ba;s/\r{0,1}\n/\\n/g')
 MONGO_NODES=""
-for i in `seq 0 $((${MONGO_REPLICAS}-1))`; do
-    MONGO_NODES="${MONGO_NODES}\n      - host: mas-mongo-ce-${i}.mas-mongo-ce-svc.mongo.svc.cluster.local\n        port: 27017\n"
+for i in $(seq 0 $((${MONGO_REPLICAS} - 1))); do
+  MONGO_NODES="${MONGO_NODES}\n      - host: mas-mongo-ce-${i}.mas-mongo-ce-svc.mongo.svc.cluster.local\n        port: 27017\n"
 done
 MONGO_NODES=$(echo -ne "${MONGO_NODES}")
 
@@ -149,4 +149,4 @@ ${MONGO_NODES}
 EOF
 
 displayStepHeader 8 "Wait License Service instance ready."
-while [[ $(oc get -n ${projectName} licenseservice | grep sls | tr -s " " | cut -d' ' -f 3) != "True" ]]; do sleep 5s; done
+while [[ $(oc get -n ${projectName} licenseservice | grep sls | tr -s " " | cut -d' ' -f 2) != "Ready" ]]; do sleep 5s; done
